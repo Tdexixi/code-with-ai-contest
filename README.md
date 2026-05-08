@@ -1,5 +1,43 @@
 # **🚀 “Code with AI” 海选赛：5G 信号可视化看板挑战**
 
+## **本仓库：看板功能与运行说明**
+
+本仓库实现了一个基于 **Streamlit + pydeck + plotly** 的 5G 路测数据看板，数据文件为 `data/signal_samples.csv`。
+
+**功能概要**
+
+- 使用 **pandas** 加载 CSV；核心计算与筛选逻辑在 `dashboard_core.py`，并配有 **pytest** 单元测试（`tests/test_dashboard_core.py`）。
+- 主区域 **交互地图**：点位颜色按 **RSRP\_dBm** 分级（强于 -90 dBm 偏绿，弱于 -110 dBm 偏红）；**3D ColumnLayer** 柱体高度与 **Download\_Mbps** 成正比，可拖动侧栏筛选后实时刷新。
+- 地图下方提供 **各频段样本数量柱状图**、**终端类型占比饼图**、RSRP 分布与扩展分析图表。
+- 左侧 **侧边栏**：频段多选、RSRP 滑动条、终端类型多选，与地图及图表联动。
+
+**环境要求**：Python 3.10+（建议 3.11）。
+
+**安装与运行**
+
+```bash
+cd /path/to/this/repo
+python -m venv .venv
+# Windows: .venv\Scripts\activate
+# macOS/Linux: source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m streamlit run app.py
+```
+
+在 Windows 上若直接输入 `streamlit` 提示不是内部或外部命令，请始终使用 **`python -m streamlit run app.py`**（不依赖 `Scripts` 是否加入 PATH），或在项目根目录双击 **`run.bat`**。
+
+浏览器将打开本地页面（默认 `http://localhost:8501`）。
+
+**运行单元测试**
+
+```bash
+python -m pytest tests/ -q
+```
+
+**提交物提示**（赛方要求）：除源码与 `requirements.txt` 外，还需补充 **运行截图**（建议放在 `screenshots/` 目录并在下文 PR 说明中引用）、以及 **`AI_PROMPTS.md` 中粘贴真实 Agent 对话导出**（团队信息与日志需自行填写）。
+
+---
+
 ## **一、 比赛背景**
 
 **“还在头疼繁琐的代码逻辑？还在为写详设文档发愁？快来试试AI Coding Agent！”**
@@ -68,6 +106,6 @@
 
    > *"请使用 Streamlit 写一个看板，帮我读取当前目录下的 `data/signal_samples.csv`，在网页上加个大标题，然后用 st.map() 把数据里的纬度(Latitude)和经度(Longitude)画在地图上。"*
 
-3. **看结果**：AI 生成代码并 Apply 后，在终端运行 `streamlit run 你的文件名.py`。你的浏览器会自动打开一个本地网页，见证奇迹！
+3. **看结果**：AI 生成代码并 Apply 后，在终端运行 `python -m streamlit run 你的文件名.py`。你的浏览器会自动打开一个本地网页，见证奇迹！
 
 4. **不断迭代**：继续对着 AI 提出修改意见，比如 *"帮我修一下运行错误"*，或者 *"在左边加一个滑动条，只显示筛选后的数据..."*。
