@@ -8,14 +8,14 @@
 
 ## 交互记录导出说明
 
-为真实反映「Code with AI」代码构建过程，本文件采用 **方式一：直接粘贴完整日志**。以下两段均为 **与源文件逐字一致** 的全文（未做概括或改写）。
+为真实反映「Code with AI」代码构建过程，本文件采用 **方式一：直接粘贴完整日志**。以下两段均为 **与导出时逐字一致** 的全文（未做概括或改写）。
 
-- **GitHub Copilot**：正文见下栏「第一部分」代码块，内容与仓库根目录 `Copilot_Conversation.md` **完全相同**（含时间戳行、换行与标点）。
-- **Cursor**：正文见下栏「第二部分」代码块，为 Cursor 导出的 **JSON Lines**（每行一条 JSON）；助手消息中的 `[REDACTED]` 与导出文件一致。仓库内另有同内容副本：`cursor_agent_transcript.jsonl`。
+- **GitHub Copilot**：见下文「第一部分」围栏内，为 Copilot Chat 侧导出原文（含时间戳行、换行与标点）。
+- **Cursor**：见下文「第二部分」围栏内，为 Cursor Agent 会话 **JSON Lines**（每行一条 JSON）；助手消息中的 `[REDACTED]` 与导出时一致。
 
 ---
 
-## 第一部分：GitHub Copilot Chat（`Copilot_Conversation.md` 全文）
+## 第一部分：GitHub Copilot Chat（导出原文）
 
 ``````text
 1161154996: 05-08 19:08:19
