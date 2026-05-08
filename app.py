@@ -97,6 +97,14 @@ if 'Latitude' in df_filtered_copy.columns and 'Longitude' in df_filtered_copy.co
         (df_filtered_copy['RSRP_dBm'].notna())
     ].copy()
     
+    # 确保颜色列是列表类型（不是嵌套在 DataFrame 中）
+    valid_data_dict = valid_data.to_dict('records')
+    for record in valid_data_dict:
+        if isinstance(record['color'], (list, tuple)):
+            record['color'] = list(record['color'])
+    
+    valid_data = pd.DataFrame(valid_data_dict)
+    
     if len(valid_data) > 0:
         # 使用 pydeck 创建散点地图
         layer = pdk.Layer(
@@ -160,10 +168,16 @@ with col2:
     else:
         st.info("数据中无终端类型信息")
 
-# RSRP 信号强度分布
+# RSRP 信号强度分布 - 修复版本
 st.write("**信号强度分布**")
-rsrp_bins = pd.cut(df_filtered['RSRP_dBm'], bins=8)
-rsrp_dist = rsrp_bins.value_counts().sort_index()
+# 使用 numpy 的 histogram 而不是 pd.cut 来避免 Interval 对象问题
+rsrp_values = df_filtered['RSRP_dBm'].values
+counts, bins = np.histogram(rsrp_values, bins=8)
+
+# 创建标签（如 "-120 to -115" 的格式）
+labels = [f"{bins[i]:.0f} to {bins[i+1]:.0f}" for i in range(len(bins)-1)]
+rsrp_dist = pd.Series(counts, index=labels)
+
 st.bar_chart(rsrp_dist)
 
 # ==========================================
