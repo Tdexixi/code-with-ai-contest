@@ -9,18 +9,18 @@
 | 模块 | 说明 |
 |------|------|
 | **数据加载** | 使用 **pandas** 读取 `data/signal_samples.csv`（经纬度、小区、频段、RSRP、SINR、终端类型、下载速率等）。 |
-| **交互地图** | **pydeck**：散点 + **3D ColumnLayer**，点颜色按 **RSRP_dBm** 分级（优于 -90 dBm 偏绿，劣于 -110 dBm 偏红；中间过渡）；柱高与 **Download_Mbps** 成正比，可旋转视角查看。 |
+| **交互地图** | **pydeck**：散点 + **3D ColumnLayer**，点颜色按 `RSRP_dBm` 分级（优于 -90 dBm 偏绿，劣于 -110 dBm 偏红；中间过渡）；柱高与 `Download_Mbps` 成正比，可旋转视角查看。 |
 | **侧边栏筛选** | 频段多选、RSRP 范围滑块、终端类型多选；筛选后地图与下方图表**同步刷新**；无数据时有提示，避免报错。 |
 | **统计图表** | **Plotly**：各频段样本量柱状图、终端类型占比饼图、RSRP 分布与信号等级、频段与速率关系等。 |
 | **数据表** | 筛选结果分页表格（中文列名）。 |
-| **工程化** | 可复用逻辑集中在 **`dashboard_core.py`**（含注释）；**`pytest tests/`** 覆盖加载、配色、筛选等核心函数。 |
+| **工程化** | 可复用逻辑集中在 `dashboard_core.py`（含注释）；单元测试见 `tests/`，执行 `pytest tests/ -q`。 |
 
 ---
 
 ## 运行环境
 
 - **Python** 3.10+（推荐 3.11；依赖见 `requirements.txt`，已固定主要包版本）。
-- 浏览器访问本地 **http://localhost:8501**（Streamlit 默认端口）。
+- 浏览器访问本地：<http://localhost:8501>（Streamlit 默认端口）。
 
 ---
 
