@@ -1,214 +1,383 @@
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
+import plotly.express as px
+import plotly.graph_objects as go
 import numpy as np
 
-# 设置页面配置
-st.set_page_config(page_title="5G 信号可视化看板", layout="wide")
+# 页面配置
+st.set_page_config(
+    page_title="5G 信号可视化看板",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-st.title("📡 5G 信号可视化看板")
-st.markdown("欢迎来到 **'Code with AI' 极客探索赛**！")
-st.info("💡 **通关提示**：这是基础关卡的完整实现，包含数据加载、地图渲染和图表展示。")
+# 自定义CSS样式
+st.markdown("""
+    <style>
+    .main-title {
+        font-size: 3em;
+        font-weight: bold;
+        color: #1f77b4;
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 20px;
+        border-radius: 10px;
+        margin: 10px 0;
+    }
+    .status-strong {
+        color: green;
+        font-weight: bold;
+    }
+    .status-medium {
+        color: orange;
+        font-weight: bold;
+    }
+    .status-weak {
+        color: red;
+        font-weight: bold;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 标题
+st.markdown('<h1 class="main-title">📡 5G信号可视化看板</h1>', unsafe_allow_html=True)
+st.markdown("### 来自 'Code with AI' 极客探索赛 🚀")
 
 # ==========================================
-# 基础关卡：数据加载
+# 数据加载和处理
 # ==========================================
-try:
-    # 使用 pandas 读取 CSV 数据
+@st.cache_data
+def load_data():
     df = pd.read_csv('data/signal_samples.csv')
-    st.success(f"✅ 成功加载数据：{len(df)} 条记录")
+    return df.dropna()
+
+try:
+    df = load_data()
+    st.success(f"✅ 成功加载 {len(df)} 条 5G 信号数据")
 except FileNotFoundError:
-    st.error("❌ 找不到 data/signal_samples.csv 文件，请确保数据文件存在。")
+    st.error("❌ 找不到数据文件，请确保 data/signal_samples.csv 存在")
     st.stop()
 
-# 数据清洗：删除包含 NaN 的行
-df_clean = df.dropna()
-
 # ==========================================
-# 基础关卡：侧边栏筛选器（进阶功能）
+# 侧边栏筛选器
 # ==========================================
-st.sidebar.header("🔧 筛选器")
+st.sidebar.markdown("## 🔧 筛选器")
 
 # 频段筛选
-if 'Band' in df_clean.columns:
-    bands = sorted(df_clean['Band'].unique())
-    selected_bands = st.sidebar.multiselect(
-        "选择频段 (Band)",
-        options=bands,
-        default=bands
-    )
-    df_filtered = df_clean[df_clean['Band'].isin(selected_bands)]
-else:
-    df_filtered = df_clean
+bands = sorted(df['Band'].unique())
+selected_bands = st.sidebar.multiselect(
+    "📶 选择频段",
+    options=bands,
+    default=bands,
+    key="band_filter"
+)
 
 # RSRP 范围筛选
-if 'RSRP_dBm' in df_filtered.columns:
-    rsrp_min = float(df_filtered['RSRP_dBm'].min())
-    rsrp_max = float(df_filtered['RSRP_dBm'].max())
-    selected_rsrp_range = st.sidebar.slider(
-        "选择 RSRP 范围 (dBm)",
-        min_value=rsrp_min,
-        max_value=rsrp_max,
-        value=(rsrp_min, rsrp_max),
-        step=1.0
+rsrp_min = float(df['RSRP_dBm'].min())
+rsrp_max = float(df['RSRP_dBm'].max())
+selected_rsrp_range = st.sidebar.slider(
+    "📊 RSRP 信号强度范围 (dBm)",
+    min_value=rsrp_min,
+    max_value=rsrp_max,
+    value=(rsrp_min, rsrp_max),
+    step=1.0
+)
+
+# 终端类型筛选
+terminal_types = df['TerminalType'].unique().tolist()
+selected_terminals = st.sidebar.multiselect(
+    "📱 选择终端类型",
+    options=terminal_types,
+    default=terminal_types,
+    key="terminal_filter"
+)
+
+# 应用筛选器
+df_filtered = df[
+    (df['Band'].isin(selected_bands)) &
+    (df['RSRP_dBm'] >= selected_rsrp_range[0]) &
+    (df['RSRP_dBm'] <= selected_rsrp_range[1]) &
+    (df['TerminalType'].isin(selected_terminals))
+]
+
+st.sidebar.info(f"📈 当前显示：**{len(df_filtered)}** 条数据（总数：{len(df)}）")
+
+# ==========================================
+# 顶部指标卡片
+# ==========================================
+st.markdown("### 📊 关键指标")
+col1, col2, col3, col4, col5 = st.columns(5)
+
+with col1:
+    st.metric(
+        "📍 总数据点",
+        len(df_filtered),
+        delta=f"{len(df_filtered) - len(df)}" if len(df_filtered) != len(df) else "全部"
     )
-    df_filtered = df_filtered[
-        (df_filtered['RSRP_dBm'] >= selected_rsrp_range[0]) &
-        (df_filtered['RSRP_dBm'] <= selected_rsrp_range[1])
-    ]
 
-st.sidebar.write(f"当前显示 {len(df_filtered)} 条数据")
+with col2:
+    avg_rsrp = df_filtered['RSRP_dBm'].mean()
+    st.metric("📊 平均信号强度", f"{avg_rsrp:.2f} dBm")
+
+with col3:
+    max_rsrp = df_filtered['RSRP_dBm'].max()
+    st.metric("🟢 最强信号", f"{max_rsrp:.2f} dBm")
+
+with col4:
+    min_rsrp = df_filtered['RSRP_dBm'].min()
+    st.metric("🔴 最弱信号", f"{min_rsrp:.2f} dBm")
+
+with col5:
+    avg_speed = df_filtered['Download_Mbps'].mean()
+    st.metric("⚡ 平均下载速率", f"{avg_speed:.2f} Mbps")
 
 # ==========================================
-# 基础关卡：信号热力/散点地图
+# 地图和图表布局
 # ==========================================
-st.subheader("🗺️ 5G 信号热力地图")
+st.markdown("---")
+st.markdown("### 🗺️ 信号热力地图")
 
-# 定义颜色函数：根据 RSRP 信号强度变色
+# 定义颜色函数
 def get_color(rsrp):
-    """
-    根据 RSRP 信号强度返回 RGB 颜色
-    大于 -90dBm 为绿色，小于 -110dBm 为红色，中间为黄色
-    """
+    """根据RSRP信号强度返回颜色"""
     if rsrp > -90:
-        return [0, 255, 0, 180]  # 绿色 (强信号)
+        return [0, 255, 0, 200]  # 绿色 - 强信号
     elif rsrp < -110:
-        return [255, 0, 0, 180]  # 红色 (弱信号)
+        return [255, 0, 0, 200]  # 红色 - 弱信号
     else:
-        # 黄色到红色的渐变
-        ratio = (rsrp + 110) / 20  # 0 到 1 的比例
+        ratio = (rsrp + 110) / 20
         return [
-            int(255 * (1 - ratio)),  # R
-            int(255 * ratio),        # G
-            0,                       # B
-            180                      # 透明度
+            int(255 * (1 - ratio)),
+            int(255 * ratio),
+            0,
+            200
         ]
 
-# 为数据添加颜色列
-df_filtered_copy = df_filtered.copy()
-df_filtered_copy['color'] = df_filtered_copy['RSRP_dBm'].apply(get_color)
-
 # 准备地图数据
-if 'Latitude' in df_filtered_copy.columns and 'Longitude' in df_filtered_copy.columns:
-    # 检查数据有效性
-    valid_data = df_filtered_copy[
-        (df_filtered_copy['Latitude'].notna()) &
-        (df_filtered_copy['Longitude'].notna()) &
-        (df_filtered_copy['RSRP_dBm'].notna())
-    ].copy()
+map_data = df_filtered.copy()
+map_data['color'] = map_data['RSRP_dBm'].apply(get_color)
+
+if len(map_data) > 0:
+    # 创建地图层
+    layer = pdk.Layer(
+        'ScatterplotLayer',
+        data=map_data,
+        get_position=['Longitude', 'Latitude'],
+        get_color='color',
+        get_radius=100,
+        pickable=True,
+        auto_highlight=True,
+    )
     
-    # 确保颜色列是列表类型（不是嵌套在 DataFrame 中）
-    valid_data_dict = valid_data.to_dict('records')
-    for record in valid_data_dict:
-        if isinstance(record['color'], (list, tuple)):
-            record['color'] = list(record['color'])
+    # 计算地图中心和缩放级别
+    center_lat = map_data['Latitude'].mean()
+    center_lon = map_data['Longitude'].mean()
     
-    valid_data = pd.DataFrame(valid_data_dict)
+    view_state = pdk.ViewState(
+        latitude=center_lat,
+        longitude=center_lon,
+        zoom=11,
+        pitch=30,
+    )
     
-    if len(valid_data) > 0:
-        # 使用 pydeck 创建散点地图
-        layer = pdk.Layer(
-            'ScatterplotLayer',
-            data=valid_data,
-            get_position=['Longitude', 'Latitude'],
-            get_color='color',
-            get_radius=80,
-            pickable=True,
-            auto_highlight=True,
+    # 渲染地图
+    st.pydeck_chart(
+        pdk.Deck(
+            layers=[layer],
+            initial_view_state=view_state,
+            tooltip={
+                "text": "📍 位置: ({Latitude:.4f}, {Longitude:.4f})\n📶 信号强度: {RSRP_dBm:.2f} dBm\n📡 频段: {Band}\n📱 终端: {TerminalType}\n⚡ 速率: {Download_Mbps:.2f} Mbps"
+            }
         )
-        
-        # 计算地图中心
-        center_lat = valid_data['Latitude'].mean()
-        center_lon = valid_data['Longitude'].mean()
-        
-        view_state = pdk.ViewState(
-            latitude=center_lat,
-            longitude=center_lon,
-            zoom=11,
-            pitch=30,
-        )
-        
-        # 渲染地图
-        st.pydeck_chart(
-            pdk.Deck(
-                layers=[layer],
-                initial_view_state=view_state,
-                tooltip={
-                    "text": "RSRP: {RSRP_dBm} dBm\nBand: {Band}\nLatitude: {Latitude}\nLongitude: {Longitude}"
-                }
-            )
-        )
-    else:
-        st.warning("⚠️ 没有有效的地理位置数据")
+    )
 else:
-    st.warning("⚠️ 数据中缺少经纬度信息 (Latitude/Longitude)")
+    st.warning("⚠️ 没有符合条件的数据")
 
 # ==========================================
-# 基础关卡：数据概览图表
+# 统计图表
 # ==========================================
-st.subheader("📊 数据统计分析")
+st.markdown("---")
+st.markdown("### 📈 数据分析")
 
-col1, col2 = st.columns(2)
+chart_col1, chart_col2 = st.columns(2)
 
 # 频段统计
-with col1:
-    st.write("**各频段基站数量**")
-    if 'Band' in df_filtered.columns:
-        band_counts = df_filtered['Band'].value_counts().sort_values(ascending=False)
-        st.bar_chart(band_counts)
-    else:
-        st.info("数据中无频段 (Band) 信息")
+with chart_col1:
+    st.markdown("#### 各频段基站数量")
+    band_counts = df_filtered['Band'].value_counts().reset_index()
+    band_counts.columns = ['Band', 'Count']
+    fig_band = px.bar(
+        band_counts,
+        x='Band',
+        y='Count',
+        color='Count',
+        color_continuous_scale='Viridis',
+        labels={'Count': '基站数量'},
+        title='频段分布'
+    )
+    st.plotly_chart(fig_band, use_container_width=True)
 
 # 终端类型统计
-with col2:
-    st.write("**不同终端类型占比**")
-    if 'TerminalType' in df_filtered.columns:
-        terminal_counts = df_filtered['TerminalType'].value_counts()
-        st.bar_chart(terminal_counts)
+with chart_col2:
+    st.markdown("#### 终端类型分布")
+    terminal_counts = df_filtered['TerminalType'].value_counts().reset_index()
+    terminal_counts.columns = ['TerminalType', 'Count']
+    fig_terminal = px.pie(
+        terminal_counts,
+        names='TerminalType',
+        values='Count',
+        title='终端类型占比'
+    )
+    st.plotly_chart(fig_terminal, use_container_width=True)
+
+# ==========================================
+# RSRP分布图
+# ==========================================
+st.markdown("#### RSRP信号强度分布")
+rsrp_hist = go.Histogram(
+    x=df_filtered['RSRP_dBm'],
+    nbinsx=30,
+    name='RSRP',
+    marker=dict(color='#1f77b4')
+)
+
+# 添加参考线
+fig_rsrp = go.Figure(data=[rsrp_hist])
+fig_rsrp.add_vline(x=-90, line_dash="dash", line_color="green", 
+                   annotation_text="强信号 (-90dBm)", annotation_position="top left")
+fig_rsrp.add_vline(x=-110, line_dash="dash", line_color="red",
+                   annotation_text="弱信号 (-110dBm)", annotation_position="top right")
+fig_rsrp.update_layout(
+    title='RSRP信号强度分布直方图',
+    xaxis_title='RSRP (dBm)',
+    yaxis_title='频数',
+    hovermode='x unified'
+)
+st.plotly_chart(fig_rsrp, use_container_width=True)
+
+# ==========================================
+# 信号强度等级分析
+# ==========================================
+st.markdown("#### 信号强度等级统计")
+
+def classify_signal(rsrp):
+    if rsrp > -90:
+        return '优秀'
+    elif rsrp > -100:
+        return '良好'
+    elif rsrp > -110:
+        return '一般'
     else:
-        st.info("数据中无终端类型信息")
+        return '较弱'
 
-# RSRP 信号强度分布 - 修复版本
-st.write("**信号强度分布**")
-# 使用 numpy 的 histogram 而不是 pd.cut 来避免 Interval 对象问题
-rsrp_values = df_filtered['RSRP_dBm'].values
-counts, bins = np.histogram(rsrp_values, bins=8)
+df_filtered['Signal_Level'] = df_filtered['RSRP_dBm'].apply(classify_signal)
+signal_dist = df_filtered['Signal_Level'].value_counts().reindex(['优秀', '良好', '一般', '较弱'], fill_value=0)
 
-# 创建标签（如 "-120 to -115" 的格式）
-labels = [f"{bins[i]:.0f} to {bins[i+1]:.0f}" for i in range(len(bins)-1)]
-rsrp_dist = pd.Series(counts, index=labels)
+colors_map = {'优秀': '#00FF00', '良好': '#FFFF00', '一般': '#FFA500', '较弱': '#FF0000'}
+fig_level = go.Figure(data=[
+    go.Bar(
+        x=signal_dist.index,
+        y=signal_dist.values,
+        marker=dict(color=[colors_map.get(level, 'gray') for level in signal_dist.index])
+    )
+])
+fig_level.update_layout(
+    title='信号质量等级分布',
+    xaxis_title='信号等级',
+    yaxis_title='数据点数量',
+    hovermode='x'
+)
+st.plotly_chart(fig_level, use_container_width=True)
 
-st.bar_chart(rsrp_dist)
+# ==========================================
+# 下载速率分析
+# ==========================================
+st.markdown("#### 频段与下载速率关系")
+band_speed = df_filtered.groupby('Band')['Download_Mbps'].agg(['mean', 'max', 'min']).reset_index()
+fig_speed = px.bar(
+    band_speed,
+    x='Band',
+    y='mean',
+    error_y='max',
+    color='mean',
+    color_continuous_scale='RdYlGn',
+    title='各频段平均下载速率',
+    labels={'mean': '平均速率 (Mbps)'}
+)
+st.plotly_chart(fig_speed, use_container_width=True)
 
 # ==========================================
 # 数据表预览
 # ==========================================
-st.subheader("📋 数据表预览")
-display_cols = ['Latitude', 'Longitude', 'RSRP_dBm', 'Band', 'TerminalType', 'Download_Mbps']
+st.markdown("---")
+st.markdown("### 📋 详细数据表")
+
+# 选择显示的列
+display_cols = ['Latitude', 'Longitude', 'CellID', 'Band', 'RSRP_dBm', 'SINR_dB', 'TerminalType', 'Download_Mbps']
+df_display = df_filtered[display_cols].copy()
+df_display.columns = ['纬度', '经度', '基站ID', '频段', 'RSRP(dBm)', 'SINR(dB)', '终端类型', '下载速率(Mbps)']
+
+# 添加分页显示
+page_size = 20
+total_pages = (len(df_display) + page_size - 1) // page_size
+page = st.selectbox("选择页码", range(1, total_pages + 1), index=0)
+start_idx = (page - 1) * page_size
+end_idx = start_idx + page_size
+
 st.dataframe(
-    df_filtered[display_cols],
+    df_display.iloc[start_idx:end_idx],
     use_container_width=True,
-    height=300
+    height=400
 )
 
-st.markdown("---")
-st.markdown("✅ **基础关卡完成！** 现在执行以下命令来提交进度：")
-st.code("""
-git add .
-git commit -m "Complete basic level: data loading, signal heatmap, and statistics charts"
-git tag basic-done
-git push origin basic-done
-""", language="bash")
+st.info(f"📄 共 {len(df_display)} 条数据，第 {page} 页，每页 {page_size} 条")
 
-# 底部统计信息
+# ==========================================
+# 页脚
+# ==========================================
 st.markdown("---")
-st.markdown("### 📈 数据统计摘要")
-col1, col2, col3, col4 = st.columns(4)
-with col1:
-    st.metric("总记录数", len(df_filtered))
-with col2:
-    st.metric("平均 RSRP", f"{df_filtered['RSRP_dBm'].mean():.2f} dBm")
-with col3:
-    st.metric("最强信号", f"{df_filtered['RSRP_dBm'].max():.2f} dBm")
-with col4:
-    st.metric("最弱信号", f"{df_filtered['RSRP_dBm'].min():.2f} dBm")
+st.markdown("""
+### 📌 基础关卡完成检查清单
+
+✅ **已实现的功能：**
+- ✓ 数据加载（pandas读取CSV）
+- ✓ 信号热力地图（根据RSRP变色）
+- ✓ 数据概览图表（频段、终端、信号强度）
+- ✓ 侧边栏联动筛选（频段、RSRP范围、终端类型）
+- ✓ 实时数据更新
+- ✓ 详细数据表展示
+
+### 🎯 提交步骤
+
+```bash
+# 1. 添加所有文件
+git add .
+
+# 2. 提交代码
+git commit -m "Complete basic level: full 5G signal visualization dashboard"
+
+# 3. 打上基础关卡标签
+git tag basic-done
+
+# 4. 推送到远程仓库
+git push origin main
+git push origin basic-done
+```
+""")
+
+# 显示数据统计摘要
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 📊 数据摘要")
+st.sidebar.markdown(f"""
+- **总记录数：** {len(df)}
+- **筛选后：** {len(df_filtered)}
+- **RSRP范围：** {df_filtered['RSRP_dBm'].min():.2f} ~ {df_filtered['RSRP_dBm'].max():.2f} dBm
+- **平均RSRP：** {df_filtered['RSRP_dBm'].mean():.2f} dBm
+- **平均速率：** {df_filtered['Download_Mbps'].mean():.2f} Mbps
+- **频段数：** {len(df_filtered['Band'].unique())}
+- **终端类型：** {', '.join(df_filtered['TerminalType'].unique())}
+""")
